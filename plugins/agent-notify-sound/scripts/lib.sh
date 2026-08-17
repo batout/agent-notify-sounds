@@ -356,10 +356,10 @@ ps_play_command() {   # <windows path> <volume>
 try{Add-Type -AssemblyName presentationCore -EA Stop;\
 \$p=New-Object System.Windows.Media.MediaPlayer;\
 \$p.Volume=$vol;\$p.Open([uri]'$wf');\
-\$d=(Get-Date).AddSeconds(5);\
+\$d=(Get-Date).AddSeconds(2);\
 while(-not \$p.NaturalDuration.HasTimeSpan -and (Get-Date) -lt \$d){Start-Sleep -Milliseconds 20};\
 \$p.Play();\
-if(\$p.NaturalDuration.HasTimeSpan){Start-Sleep -Milliseconds ([int]\$p.NaturalDuration.TimeSpan.TotalMilliseconds+250)}else{Start-Sleep -Seconds 3};\
+if(\$p.NaturalDuration.HasTimeSpan){Start-Sleep -Milliseconds ([int]\$p.NaturalDuration.TimeSpan.TotalMilliseconds+250)}else{Start-Sleep -Seconds 2};\
 \$p.Stop();\$p.Close()}\
 catch{(New-Object Media.SoundPlayer '$wf').PlaySync()}"
 }
