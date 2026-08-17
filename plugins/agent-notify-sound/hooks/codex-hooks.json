@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$PLUGIN_ROOT/scripts/mark.sh\" --host codex",
+            "command": "bash \"$PLUGIN_ROOT/scripts/mark.sh\" --host codex",
             "timeout": 5
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$PLUGIN_ROOT/scripts/play.sh\" --host codex done",
+            "command": "bash \"$PLUGIN_ROOT/scripts/play.sh\" --host codex done",
             "timeout": 5
           }
         ]
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$PLUGIN_ROOT/scripts/play.sh\" --host codex subagent",
+            "command": "bash \"$PLUGIN_ROOT/scripts/play.sh\" --host codex subagent",
             "timeout": 5
           }
         ]
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$PLUGIN_ROOT/scripts/play.sh\" --host codex attention",
+            "command": "bash \"$PLUGIN_ROOT/scripts/play.sh\" --host codex attention",
             "timeout": 5
           }
         ]
@@ -50,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$PLUGIN_ROOT/scripts/play.sh\" --host codex plan",
+            "command": "bash \"$PLUGIN_ROOT/scripts/play.sh\" --host codex plan",
             "timeout": 5
           }
         ]

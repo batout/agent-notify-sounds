@@ -19,6 +19,19 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN="$ROOT/plugins/agent-notify-sound"
 MARK="$PLUGIN/scripts/mark.sh"
 PLAY="$PLUGIN/scripts/play.sh"
+
+# is_windows and win_path, so a Git Bash or WSL install writes a command the
+# Windows side of Cursor and Codex can actually run.
+# shellcheck source=plugins/agent-notify-sound/scripts/lib.sh
+. "$PLUGIN/scripts/lib.sh"
+
+if is_windows; then
+  MARK_CMD="bash \"$(win_path "$MARK")\""
+  PLAY_CMD="bash \"$(win_path "$PLAY")\""
+else
+  MARK_CMD="bash \"$MARK\""
+  PLAY_CMD="bash \"$PLAY\""
+fi
 MARKER_OPEN="# >>> agent-notify-sound >>>"
 MARKER_CLOSE="# <<< agent-notify-sound <<<"
 
@@ -61,16 +74,16 @@ cursor_install() {
   need_python
   mkdir -p "$(dirname "$cursor_file")"
   backup "$cursor_file"
-  MARK="$MARK" PLAY="$PLAY" FILE="$cursor_file" python3 - <<'PY'
+  MARK="$MARK_CMD" PLAY="$PLAY_CMD" FILE="$cursor_file" python3 - <<'PY'
 import json, os
 
 path, mark, play = os.environ["FILE"], os.environ["MARK"], os.environ["PLAY"]
 wanted = {
-    "beforeSubmitPrompt": f'"{mark}" --host cursor',
-    "stop":               f'"{play}" --host cursor done',
-    "subagentStop":       f'"{play}" --host cursor subagent',
-    "beforeShellExecution": f'"{play}" --host cursor attention',
-    "beforeMCPExecution":   f'"{play}" --host cursor attention',
+    "beforeSubmitPrompt": f'{mark} --host cursor',
+    "stop":               f'{play} --host cursor done',
+    "subagentStop":       f'{play} --host cursor subagent',
+    "beforeShellExecution": f'{play} --host cursor attention',
+    "beforeMCPExecution":   f'{play} --host cursor attention',
 }
 
 cfg = {}
@@ -104,17 +117,20 @@ cursor_uninstall() {
   need_python
   [ -f "$cursor_file" ] || { echo "nothing to remove: $cursor_file"; return 0; }
   backup "$cursor_file"
-  PLUGIN="$PLUGIN" FILE="$cursor_file" python3 - <<'PY'
+  FILE="$cursor_file" python3 - <<'PY'
 import json, os
 
-path, plugin = os.environ["FILE"], os.environ["PLUGIN"]
+path = os.environ["FILE"]
 with open(path) as fh:
     cfg = json.load(fh)
 
+# Match on the plugin directory name so a Windows path with backslashes is
+# recognised the same as a unix one.
 removed = 0
 for event, entries in list(cfg.get("hooks", {}).items()):
     keep = [e for e in entries
-            if not (isinstance(e, dict) and plugin in str(e.get("command", "")))]
+            if not (isinstance(e, dict)
+                    and "agent-notify-sound" in str(e.get("command", "")))]
     removed += len(entries) - len(keep)
     if keep:
         cfg["hooks"][event] = keep
@@ -153,32 +169,32 @@ codex_block() {
 [[hooks.UserPromptSubmit]]
 [[hooks.UserPromptSubmit.hooks]]
 type = "command"
-command = '"$MARK" --host codex'
+command = '$MARK_CMD --host codex'
 timeout = 5
 
 [[hooks.Stop]]
 [[hooks.Stop.hooks]]
 type = "command"
-command = '"$PLAY" --host codex done'
+command = '$PLAY_CMD --host codex done'
 timeout = 5
 
 [[hooks.SubagentStop]]
 [[hooks.SubagentStop.hooks]]
 type = "command"
-command = '"$PLAY" --host codex subagent'
+command = '$PLAY_CMD --host codex subagent'
 timeout = 5
 
 [[hooks.PermissionRequest]]
 [[hooks.PermissionRequest.hooks]]
 type = "command"
-command = '"$PLAY" --host codex attention'
+command = '$PLAY_CMD --host codex attention'
 timeout = 5
 
 [[hooks.PreToolUse]]
 matcher = "ExitPlanMode"
 [[hooks.PreToolUse.hooks]]
 type = "command"
-command = '"$PLAY" --host codex plan'
+command = '$PLAY_CMD --host codex plan'
 timeout = 5
 TOML
 }

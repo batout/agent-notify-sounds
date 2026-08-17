@@ -43,6 +43,71 @@ cd agent-notify-sounds
 `./install.sh --uninstall cursor` takes it back out, and every file it touches is
 backed up first.
 
+## Setup by platform
+
+macOS, Linux and Windows all work. What differs is which program ends up
+playing the file, and `/sound status` names the one it picked.
+
+### macOS
+
+Nothing to install. `afplay` ships with the system and handles every format in
+the repo, volume included.
+
+The `system` theme plays Glass, Submarine, Hero and Pop out of
+`/System/Library/Sounds`. `/sound focus on` is macOS only: it asks `lsappinfo`
+which app is frontmost and skips `done` while you are looking at the terminal
+that fired it.
+
+### Linux
+
+The bundled themes are `.wav`, so a PCM player is enough:
+
+```bash
+sudo apt install pulseaudio-utils     # paplay, on most desktops already there
+sudo apt install alsa-utils           # aplay, the fallback
+```
+
+For an `.mp3` or `.ogg` theme of your own, install one of `ffplay` (ffmpeg),
+`mpg123`, `mpv` or `cvlc`. Volume works with all of them.
+
+The `system` theme uses the freedesktop sounds in
+`/usr/share/sounds/freedesktop/stereo/`, from the `sound-theme-freedesktop`
+package. Without it, `system` falls back to the bundled `zaghlalah`.
+
+Headless boxes and containers usually have no audio device at all. Over SSH the
+sound would come out of the wrong machine anyway, so the plugin rings your local
+terminal bell instead, and `remote=play` overrides that if the remote box really
+does have speakers.
+
+### Windows
+
+The scripts are bash, so run your agent from **Git Bash** or **WSL**. Both are
+supported and neither needs anything else installed: playback goes through
+PowerShell's `MediaPlayer`, which handles wav and mp3 and honours the volume
+setting. If the WPF assembly is missing, and it can be under PowerShell 7
+without the desktop runtime, it falls back to `SoundPlayer` for wav.
+
+In WSL the sound still comes out of Windows, which is the machine you are
+sitting at, so it is treated as local rather than as a remote session.
+
+The `system` theme plays `chimes`, `notify`, `chord` and `ding` from
+`C:\Windows\Media`.
+
+The hooks run the scripts as `bash "<path>/play.sh"`, so a host that shells out
+through `cmd.exe` still works as long as Git Bash is on your `PATH`. If the
+plugin install does not fire, wire it up from Git Bash or WSL instead:
+
+```bash
+./install.sh cursor
+./install.sh codex
+```
+
+That writes Windows paths (`bash "C:\...\play.sh" --host cursor done`) into your
+config, so it works no matter which shell the agent uses.
+
+`focus_aware` does nothing outside macOS. `min_turn_ms` is the setting to reach
+for on Windows and Linux when `done` fires more often than you want.
+
 ## What you hear
 
 | Cue | Fires when |
@@ -90,15 +155,16 @@ sounds.
 
 ## Roadmap
 
-Shipped in 2.0.0: Claude Code, Codex CLI, Cursor, one config shared by all
-three.
+Shipped in 2.0.0: Claude Code, Codex CLI and Cursor, one config shared by all
+three, and Windows playback through PowerShell on both Git Bash and WSL.
 
 Still open:
 
 - A real attention cue in Cursor, if Cursor ever adds a notification event.
 - The plan cue in Codex, which is wired to `ExitPlanMode` and stays silent until
   Codex exposes plan approval to hooks.
-- Windows playback past the PowerShell `SoundPlayer` fallback.
+- A focus check outside macOS, so `done` can stay quiet while you are watching
+  the window.
 - Zed and Gemini CLI once their hook surfaces settle.
 
 ## Upgrading from 1.x

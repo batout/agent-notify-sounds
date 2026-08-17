@@ -2,19 +2,29 @@
   "version": 1,
   "hooks": {
     "beforeSubmitPrompt": [
-      { "command": "\"/path/to/agent-notify-sounds/plugins/agent-notify-sound/scripts/mark.sh\" --host cursor" }
+      {
+        "command": "bash \"/path/to/agent-notify-sounds/plugins/agent-notify-sound/scripts/mark.sh\" --host cursor"
+      }
     ],
     "stop": [
-      { "command": "\"/path/to/agent-notify-sounds/plugins/agent-notify-sound/scripts/play.sh\" --host cursor done" }
+      {
+        "command": "bash \"/path/to/agent-notify-sounds/plugins/agent-notify-sound/scripts/play.sh\" --host cursor done"
+      }
     ],
     "subagentStop": [
-      { "command": "\"/path/to/agent-notify-sounds/plugins/agent-notify-sound/scripts/play.sh\" --host cursor subagent" }
+      {
+        "command": "bash \"/path/to/agent-notify-sounds/plugins/agent-notify-sound/scripts/play.sh\" --host cursor subagent"
+      }
     ],
     "beforeShellExecution": [
-      { "command": "\"/path/to/agent-notify-sounds/plugins/agent-notify-sound/scripts/play.sh\" --host cursor attention" }
+      {
+        "command": "bash \"/path/to/agent-notify-sounds/plugins/agent-notify-sound/scripts/play.sh\" --host cursor attention"
+      }
     ],
     "beforeMCPExecution": [
-      { "command": "\"/path/to/agent-notify-sounds/plugins/agent-notify-sound/scripts/play.sh\" --host cursor attention" }
+      {
+        "command": "bash \"/path/to/agent-notify-sounds/plugins/agent-notify-sound/scripts/play.sh\" --host cursor attention"
+      }
     ]
   }
 }

@@ -209,6 +209,43 @@ cfg_set() {   # <key> <value> [project]
 is_macos() { [ "$(uname -s 2>/dev/null)" = "Darwin" ]; }
 is_remote() { [ -n "${SSH_TTY:-}${SSH_CONNECTION:-}" ]; }
 
+# Git Bash, MSYS2 and Cygwin all report their own kernel name.
+is_msys() {
+  case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) return 0 ;; esac
+  return 1
+}
+
+# WSL is Linux, but the audio device belongs to Windows, so it plays the same
+# way Git Bash does.
+is_wsl() {
+  [ -n "${WSL_DISTRO_NAME:-}${WSL_INTEROP:-}" ] && return 0
+  grep -qi microsoft /proc/version 2>/dev/null
+}
+
+is_windows() { is_msys || is_wsl; }
+
+# PowerShell wants a Windows path. Git Bash has cygpath, WSL has wslpath, and
+# if neither is there the path was probably already fine.
+win_path() {
+  local p="$1" out=""
+  if command -v cygpath >/dev/null 2>&1; then
+    out="$(cygpath -w "$p" 2>/dev/null)"
+  elif command -v wslpath >/dev/null 2>&1; then
+    out="$(wslpath -w "$p" 2>/dev/null)"
+  fi
+  [ -n "$out" ] || out="$p"
+  printf '%s' "$out" | tr -d '\r'   # these tools can hand back CRLF
+}
+
+# Where C: is mounted from inside this shell.
+win_drive_c() {
+  local d
+  for d in /mnt/c /c /cygdrive/c; do
+    [ -d "$d/Windows" ] && { printf '%s' "$d"; return 0; }
+  done
+  return 1
+}
+
 normalize_theme() {   # accept the old names from 0.1.x
   case "$1" in chime|morse) printf 'zaghlalah' ;; *) printf '%s' "$1" ;; esac
 }
@@ -226,13 +263,22 @@ current_volume() { cfg_get volume "0.7"; }
 # ------------------------------------------------------------ resolution --
 # Built-in OS sounds used by the "system" theme.
 system_sound_for() {
-  local event="$1" f
+  local event="$1" f c
   if is_macos; then
     case "$event" in
       done)      f='/System/Library/Sounds/Glass.aiff' ;;
       attention) f='/System/Library/Sounds/Submarine.aiff' ;;
       plan)      f='/System/Library/Sounds/Hero.aiff' ;;
       subagent)  f='/System/Library/Sounds/Pop.aiff' ;;
+    esac
+  elif is_windows; then
+    c="$(win_drive_c)" || c=""
+    [ -n "$c" ] || return 0
+    case "$event" in   # shipped with every Windows since XP
+      done)      f="$c/Windows/Media/chimes.wav" ;;
+      attention) f="$c/Windows/Media/notify.wav" ;;
+      plan)      f="$c/Windows/Media/chord.wav" ;;
+      subagent)  f="$c/Windows/Media/ding.wav" ;;
     esac
   else
     case "$event" in   # freedesktop, present on most Linux desktops
@@ -280,14 +326,42 @@ resolve_sound() {
 pick_player() {
   local ext order p
   ext="$(printf '%s' "${1##*.}" | tr '[:upper:]' '[:lower:]')"
-  case "$ext" in
-    wav|aiff|aif) order="afplay paplay aplay ffplay mpg123 powershell.exe" ;;
-    *)            order="afplay ffplay mpg123 mpv cvlc" ;;   # compressed formats
-  esac
+  if is_windows; then
+    # Windows Media Player plays wav and mp3 and takes a volume, so it comes
+    # first for every format. WSL is included: the sound card is Windows'.
+    order="pwsh.exe powershell.exe pwsh powershell ffplay mpv mpg123"
+  else
+    case "$ext" in
+      wav|aiff|aif) order="afplay paplay aplay ffplay mpg123" ;;
+      *)            order="afplay ffplay mpg123 mpv cvlc" ;;   # compressed formats
+    esac
+  fi
   for p in $order; do
     command -v "$p" >/dev/null 2>&1 && { printf '%s' "$p"; return 0; }
   done
   return 1
+}
+
+# The PowerShell one-liner behind Windows playback. MediaPlayer handles both
+# wav and mp3 and honours a volume, and it needs the process to stay alive for
+# the length of the clip, which is fine: we are already in the background and
+# the pid file lets the next cue kill it. If the WPF assembly is missing, and
+# it can be under PowerShell 7 without the desktop runtime, SoundPlayer takes
+# over for wav.
+ps_play_command() {   # <windows path> <volume>
+  local wf vol
+  wf="$(printf '%s' "$1" | sed "s/'/''/g")"
+  vol="$2"
+  printf '%s' "\$ErrorActionPreference='SilentlyContinue';\
+try{Add-Type -AssemblyName presentationCore -EA Stop;\
+\$p=New-Object System.Windows.Media.MediaPlayer;\
+\$p.Volume=$vol;\$p.Open([uri]'$wf');\
+\$d=(Get-Date).AddSeconds(5);\
+while(-not \$p.NaturalDuration.HasTimeSpan -and (Get-Date) -lt \$d){Start-Sleep -Milliseconds 20};\
+\$p.Play();\
+if(\$p.NaturalDuration.HasTimeSpan){Start-Sleep -Milliseconds ([int]\$p.NaturalDuration.TimeSpan.TotalMilliseconds+250)}else{Start-Sleep -Seconds 3};\
+\$p.Stop();\$p.Close()}\
+catch{(New-Object Media.SoundPlayer '$wf').PlaySync()}"
 }
 
 kill_pidfile() {
@@ -336,11 +410,10 @@ play_file() {
     cvlc)    nohup cvlc --intf dummy --play-and-exit --quiet \
                --gain "$vol" "$f" >/dev/null 2>&1 </dev/null & ;;
     aplay)   nohup aplay -q "$f" >/dev/null 2>&1 </dev/null & ;;
-    powershell.exe)
-             wf="$f"
-             command -v wslpath >/dev/null 2>&1 && wf="$(wslpath -w "$f")"
-             nohup powershell.exe -NoProfile -c \
-               "(New-Object Media.SoundPlayer '$wf').PlaySync()" \
+    pwsh.exe|powershell.exe|pwsh|powershell)
+             wf="$(win_path "$f")"
+             nohup "$p" -NoProfile -NonInteractive -Command \
+               "$(ps_play_command "$wf" "$vol")" \
                >/dev/null 2>&1 </dev/null & ;;
   esac
   printf '%s' "$!" > "$(state_path pid)" 2>/dev/null

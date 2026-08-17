@@ -117,6 +117,10 @@ There is also `../../install.sh`, which writes absolute paths into
 `~/.cursor/hooks.json` or `~/.codex/config.toml` for builds without plugin
 support.
 
+On Windows, run the agent from Git Bash or WSL. Nothing else to install:
+playback goes through PowerShell. The platform notes in the
+[repo README](../../README.md) cover what each OS needs.
+
 ## Using it
 
 ```
@@ -198,6 +202,7 @@ subagent=1
 min_turn_ms=15000      # "done" only past this turn length; 0 = always ring
 done_suppress_ms=10000 # drop "done" this long after a plan/attention cue
 focus_aware=0          # 1 = also skip "done" when your terminal is frontmost
+                       #     (macOS only, ignored elsewhere)
 cursor_attention=0     # 1 = in Cursor, ring before every shell or MCP call
 debounce_ms=1800       # collapse events closer together than this
 remote=bell            # over SSH: bell | play | off
@@ -220,11 +225,18 @@ does not set.
 
 ## How playback works
 
-`scripts/play.sh` picks a player that can handle the file's format. On macOS
-that's `afplay`. Elsewhere it tries `ffplay`, `mpg123`, `mpv`, or `cvlc` for
-compressed audio, and `paplay`, `aplay`, or `powershell.exe` for PCM. Playback
-happens in the background and the script returns in about 30 ms. It tracks the
-playing PID so the next event can cut a long sound off.
+`scripts/play.sh` picks a player that can handle the file's format:
+
+| Platform | Player | Notes |
+|----------|--------|-------|
+| macOS | `afplay` | built in, every format, volume included |
+| Linux | `paplay` or `aplay` for wav, `ffplay` / `mpg123` / `mpv` / `cvlc` for compressed | install whichever your distro ships |
+| Windows, Git Bash or WSL | `powershell.exe` or `pwsh.exe` | `MediaPlayer` for wav and mp3, with volume; `SoundPlayer` for wav if the WPF assembly is missing |
+
+On Windows the file path is converted with `cygpath` or `wslpath` first, so the
+Windows side of PowerShell can find it. Playback happens in the background and
+the script returns in about 30 ms. It tracks the playing PID so the next event
+can cut a long sound off, which includes the PowerShell process.
 
 It always exits 0 and never writes to stdout. A missing player or a missing
 sound file can't block a turn or fail one; the worst case is a terminal bell.
@@ -233,7 +245,18 @@ read as a permission decision.
 
 Over SSH the sound would come out of the machine the agent is running on, which
 is not the one you're sitting at, so the local terminal's bell rings instead.
-Set `remote=play` if that box really does have speakers you can hear.
+Set `remote=play` if that box really does have speakers you can hear. WSL is not
+treated as remote: the audio comes out of the Windows machine in front of you.
+
+The `system` theme resolves per platform, and falls back to `zaghlalah` when the
+file is not there:
+
+| Cue | macOS | Linux | Windows |
+|-----|-------|-------|---------|
+| done | Glass.aiff | complete.oga | chimes.wav |
+| attention | Submarine.aiff | message.oga | notify.wav |
+| plan | Hero.aiff | dialog-information.oga | chord.wav |
+| subagent | Pop.aiff | bell.oga | ding.wav |
 
 State lives in `$TMPDIR/agent-notify-sound/`, one small file per session, keyed
 by agent and by the session id from the hook payload (`session_id` in Claude

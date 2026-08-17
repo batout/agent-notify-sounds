@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/mark.sh\" --host claude",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/mark.sh\" --host claude",
             "timeout": 5
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/play.sh\" --host claude done",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/play.sh\" --host claude done",
             "timeout": 5
           }
         ]
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/play.sh\" --host claude subagent",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/play.sh\" --host claude subagent",
             "timeout": 5
           }
         ]
@@ -42,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/play.sh\" --host claude attention",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/play.sh\" --host claude attention",
             "timeout": 5
           }
         ]
@@ -54,7 +54,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/play.sh\" --host claude plan",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/play.sh\" --host claude plan",
             "timeout": 5
           }
         ]
@@ -66,7 +66,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/play.sh\" --host claude plan",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/play.sh\" --host claude plan",
             "timeout": 5
           }
         ]
