@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "extraKnownMarketplaces": {
+    "claude-code-sounds": {
+      "source": { "source": "github", "repo": "batout/claude-code-sounds" }
+    }
+  },
+  "enabledPlugins": {
+    "notify-sound@claude-code-sounds": true
+  }
+}

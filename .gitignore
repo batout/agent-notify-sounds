@@ -1,0 +1,9 @@
+.DS_Store
+*.plugin
+*.zip
+node_modules/
+
+# Personal themes stay local. Drop a folder in sounds/ and it works for you
+# without ever being committed. See the "Adding your own sounds" section.
+plugins/notify-sound/sounds/sopranos/
+plugins/notify-sound/sounds/local-*/
