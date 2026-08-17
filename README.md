@@ -174,13 +174,12 @@ Still open:
 
 ## Upgrading from 1.x
 
-The repo, the marketplace and the plugin were all called some version of
-`claude-code-sounds` when it only ran in Claude Code. Both ids changed in 2.0,
-so an existing install needs replacing rather than updating:
+Everything is called `agent-notify-sounds` now, marketplace and plugin included,
+because it stopped being Claude-only in 2.0. The ids changed with it, so a 1.x
+install needs replacing rather than updating. Remove the old marketplace and its
+plugin first, whatever you had them registered as, then:
 
 ```
-/plugin uninstall notify-sound@claude-code-sounds
-/plugin marketplace remove claude-code-sounds
 /plugin marketplace add batout/agent-notify-sounds
 /plugin install agent-notify-sound@agent-notify-sounds
 ```
