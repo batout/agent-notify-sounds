@@ -1,6 +1,6 @@
 {
   "name": "agent-notify-sound",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Plays a sound when the agent finishes a turn, so you can work in another window and still catch the moment it wants you.",
   "author": {
     "name": "batout"

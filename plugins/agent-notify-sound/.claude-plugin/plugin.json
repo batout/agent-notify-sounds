@@ -1,6 +1,6 @@
 {
   "name": "agent-notify-sound",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Plays a sound when your coding agent finishes the work, needs an answer or a permission, or is waiting on plan approval. Works in Claude Code, Codex CLI and Cursor. Four themes, four distinct cues each.",
   "author": {
     "name": "batout"
