@@ -1,0 +1,47 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      # Windows runs the same bash the plugin expects, which is Git Bash.
+      - name: Run the suite
+        shell: bash
+        run: bash tests/run-tests.sh
+
+      - name: Check the shell scripts parse
+        shell: bash
+        run: |
+          for f in install.sh tests/run-tests.sh plugins/agent-notify-sound/scripts/*.sh; do
+            bash -n "$f"
+          done
+
+      - name: Check the manifests are valid JSON
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, sys
+          bad = 0
+          for p in pathlib.Path('.').rglob('*.json'):
+              if '.git' in p.parts:
+                  continue
+              try:
+                  json.loads(p.read_text())
+              except Exception as e:
+                  print(f'{p}: {e}')
+                  bad = 1
+          sys.exit(bad)
+          PY
