@@ -1,21 +1,21 @@
 {
-  "name": "claude-code-sounds",
+  "name": "agent-notify-sounds",
   "owner": {
     "name": "batout"
   },
   "metadata": {
-    "description": "Audio feedback plugins for Claude Code.",
-    "version": "1.1.0"
+    "description": "Audio feedback plugins for coding agents.",
+    "version": "2.0.0"
   },
   "plugins": [
     {
-      "name": "notify-sound",
-      "source": "./plugins/notify-sound",
-      "description": "Plays a sound when Claude Code finishes the work, needs an answer or a permission, or is waiting on plan approval. Four themes, four distinct cues each.",
+      "name": "agent-notify-sound",
+      "source": "./plugins/agent-notify-sound",
+      "description": "Plays a sound when your coding agent finishes the work, needs an answer or a permission, or is waiting on plan approval. Four themes, four distinct cues each.",
       "category": "productivity",
       "keywords": ["notification", "sound", "audio", "hooks", "alert", "accessibility"],
       "license": "MIT",
-      "homepage": "https://github.com/batout/claude-code-sounds"
+      "homepage": "https://github.com/batout/agent-notify-sounds"
     }
   ]
 }

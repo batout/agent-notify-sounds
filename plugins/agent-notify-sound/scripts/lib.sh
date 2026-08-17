@@ -1,16 +1,26 @@
 #!/usr/bin/env bash
-# Shared helpers for the notify-sound plugin.
+# Shared helpers for the agent-notify-sound plugin.
 # Sourced by play.sh, mark.sh and soundctl.sh.
 
-PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-SOUNDS_DIR="$PLUGIN_ROOT/sounds"
-CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-CONFIG_FILE="$CONFIG_DIR/notify-sound.conf"
+# Codex exports PLUGIN_ROOT, Claude Code exports CLAUDE_PLUGIN_ROOT, Cursor
+# exports neither, so the last resort is where this file sits.
+NS_ROOT="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
+[ -n "$NS_ROOT" ] || NS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SOUNDS_DIR="$NS_ROOT/sounds"
+
+# Which agent is calling us. Set by the --host flag the hook files pass, so one
+# config and one set of scripts serve all three.
+NS_HOST="${NS_HOST:-claude}"
+
+# One config for every host. The old Claude-only path is still read so an
+# upgrade from 1.x keeps your theme.
+CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/notify-sound/config"
+LEGACY_CONFIG_FILE="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/notify-sound.conf"
 
 EVENTS="done attention plan subagent"
 # Cues that mean "Claude stopped and is waiting on you". The `done` that the
 # Stop hook fires right behind one of these is not a finished turn, so it gets
-# suppressed — see play.sh.
+# suppressed, see play.sh.
 BLOCKING_EVENTS="attention plan"
 DEFAULT_THEME="zaghlalah"   # also the fallback when "system" isn't available
 
@@ -29,14 +39,16 @@ discover_themes() {
 THEMES="$(discover_themes)"
 
 # ----------------------------------------------------------------- state --
-# Per session, so two Claude windows never share a debounce stamp or kill each
+# Per session, so two agent windows never share a debounce stamp or kill each
 # other's clip. play.sh sets NS_SID from the hook payload; the CLI stays "cli".
-STATE_DIR="${TMPDIR:-/tmp}/claude-notify-sound"
+# The host is part of the key too, so Claude and Cursor open on the same repo
+# stay out of each other's way.
+STATE_DIR="${TMPDIR:-/tmp}/agent-notify-sound"
 NS_SID="cli"
 NS_PAYLOAD=""
 NS_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-}"
 
-state_path() { printf '%s/%s.%s' "$STATE_DIR" "$NS_SID" "$1"; }
+state_path() { printf '%s/%s-%s.%s' "$STATE_DIR" "$NS_HOST" "$NS_SID" "$1"; }
 state_init() { mkdir -p "$STATE_DIR" 2>/dev/null || true; }
 
 # Session ids come off the wire, so they never touch a path unsanitized.
@@ -74,13 +86,57 @@ json_str() {
     | sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1
 }
 
+# The hosts spell the same field differently: session_id in Claude and Codex,
+# conversation_id in Cursor. Takes the first key that is actually there.
+json_first_str() {
+  local key val
+  for key in "$@"; do
+    val="$(json_str "$key")" || val=""
+    [ -n "$val" ] && { printf '%s' "$val"; return 0; }
+  done
+  return 1
+}
+
+# First string in a JSON array field, for Cursor's workspace_roots.
+json_arr_first() {
+  local key="$1" p="${2:-$NS_PAYLOAD}"
+  [ -n "$p" ] || return 1
+  printf '%s' "$p" | tr -d '\n' \
+    | sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*\[[[:space:]]*"\([^"]*\)".*/\1/p' \
+    | head -n 1
+}
+
 # ---------------------------------------------------------------- config --
-# Simple key=value files so we never need jq. Two layers: the project file
-# wins over the user file, so a repo can have its own theme and you can tell
-# which window beeped. Missing files == defaults.
+# Simple key=value files so we never need jq. Project files win over the user
+# file, so a repo can have its own theme and you can tell which window beeped.
+# Missing files == defaults.
+
+# The config directory each host keeps its project settings in.
+host_config_dir() {
+  case "${1:-$NS_HOST}" in
+    cursor) printf '.cursor' ;;
+    codex)  printf '.codex' ;;
+    *)      printf '.claude' ;;
+  esac
+}
+
+# Where `set --here` writes: the calling host's own directory.
 project_config_file() {
   [ -n "$NS_PROJECT_DIR" ] || return 1
-  printf '%s/.claude/notify-sound.conf' "$NS_PROJECT_DIR"
+  printf '%s/%s/notify-sound.conf' "$NS_PROJECT_DIR" "$(host_config_dir)"
+}
+
+# Every project file we read, this host's first. A repo that already has a
+# theme set from Claude keeps it when you open the same repo in Cursor.
+project_config_files() {
+  local d mine
+  [ -n "$NS_PROJECT_DIR" ] || return 0
+  mine="$(host_config_dir)"
+  printf '%s/%s/notify-sound.conf\n' "$NS_PROJECT_DIR" "$mine"
+  for d in .claude .cursor .codex; do
+    [ "$d" = "$mine" ] && continue
+    printf '%s/%s/notify-sound.conf\n' "$NS_PROJECT_DIR" "$d"
+  done
 }
 
 cfg_read_file() {   # <file> <key>; fails when unset
@@ -93,24 +149,46 @@ cfg_read_file() {   # <file> <key>; fails when unset
 }
 
 cfg_get() {
-  local key="$1" default="${2:-}" val pf
-  pf="$(project_config_file 2>/dev/null)" || pf=""
-  if [ -n "$pf" ] && val="$(cfg_read_file "$pf" "$key")"; then
+  local key="$1" default="${2:-}" val f
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    if val="$(cfg_read_file "$f" "$key")"; then printf '%s' "$val"; return 0; fi
+  done <<EOF
+$(project_config_files)
+EOF
+  if val="$(cfg_read_file "$CONFIG_FILE" "$key")"; then
     printf '%s' "$val"; return 0
   fi
-  if val="$(cfg_read_file "$CONFIG_FILE" "$key")"; then
+  if val="$(cfg_read_file "$LEGACY_CONFIG_FILE" "$key")"; then
     printf '%s' "$val"; return 0
   fi
   printf '%s' "$default"
 }
 
-# Which layer a value came from — shown by `soundctl.sh status`.
+# Which layer a value came from, shown by `soundctl.sh status`.
 cfg_source() {
-  local pf
-  pf="$(project_config_file 2>/dev/null)" || pf=""
-  if [ -n "$pf" ] && cfg_read_file "$pf" "$1" >/dev/null 2>&1; then printf 'project'; return 0; fi
+  local f
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    if cfg_read_file "$f" "$1" >/dev/null 2>&1; then printf 'project'; return 0; fi
+  done <<EOF
+$(project_config_files)
+EOF
   if cfg_read_file "$CONFIG_FILE" "$1" >/dev/null 2>&1; then printf 'user'; return 0; fi
+  if cfg_read_file "$LEGACY_CONFIG_FILE" "$1" >/dev/null 2>&1; then printf 'legacy'; return 0; fi
   printf 'default'
+}
+
+# The project file a value actually came from, or nothing.
+cfg_project_hit() {
+  local f
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    if cfg_read_file "$f" "$1" >/dev/null 2>&1; then printf '%s' "$f"; return 0; fi
+  done <<EOF
+$(project_config_files)
+EOF
+  return 1
 }
 
 cfg_set() {   # <key> <value> [project]
@@ -137,7 +215,7 @@ normalize_theme() {   # accept the old names from 0.1.x
 
 current_theme() {
   local t
-  t="$(normalize_theme "${CLAUDE_SOUND_THEME:-$(cfg_get theme "")}")"
+  t="$(normalize_theme "${NOTIFY_SOUND_THEME:-${CLAUDE_SOUND_THEME:-$(cfg_get theme "")}}")"
   [ -n "$t" ] || t="$DEFAULT_THEME"
   case " $THEMES " in *" $t "*) ;; *) t="$DEFAULT_THEME" ;; esac
   printf '%s' "$t"

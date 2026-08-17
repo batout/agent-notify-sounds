@@ -1,0 +1,37 @@
+# Paste into ~/.codex/config.toml, replacing /path/to with your checkout.
+# TOML wants plain keys before tables, so keep any top level settings of yours
+# above this block. `./install.sh codex` does the same thing for you.
+
+[[hooks.UserPromptSubmit]]
+[[hooks.UserPromptSubmit.hooks]]
+type = "command"
+command = '"/path/to/agent-notify-sounds/plugins/agent-notify-sound/scripts/mark.sh" --host codex'
+timeout = 5
+
+[[hooks.Stop]]
+[[hooks.Stop.hooks]]
+type = "command"
+command = '"/path/to/agent-notify-sounds/plugins/agent-notify-sound/scripts/play.sh" --host codex done'
+timeout = 5
+
+[[hooks.SubagentStop]]
+[[hooks.SubagentStop.hooks]]
+type = "command"
+command = '"/path/to/agent-notify-sounds/plugins/agent-notify-sound/scripts/play.sh" --host codex subagent'
+timeout = 5
+
+[[hooks.PermissionRequest]]
+[[hooks.PermissionRequest.hooks]]
+type = "command"
+command = '"/path/to/agent-notify-sounds/plugins/agent-notify-sound/scripts/play.sh" --host codex attention'
+timeout = 5
+
+[[hooks.PreToolUse]]
+matcher = "ExitPlanMode"
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = '"/path/to/agent-notify-sounds/plugins/agent-notify-sound/scripts/play.sh" --host codex plan'
+timeout = 5
+
+# Older Codex builds only have the notify key. It fires once, when a turn ends:
+# notify = ["bash", "/path/to/agent-notify-sounds/plugins/agent-notify-sound/scripts/notify-codex.sh"]

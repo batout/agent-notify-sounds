@@ -2,11 +2,10 @@
   "hooks": {
     "UserPromptSubmit": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/mark.sh\"",
+            "command": "\"$PLUGIN_ROOT/scripts/mark.sh\" --host codex",
             "timeout": 5
           }
         ]
@@ -14,11 +13,10 @@
     ],
     "Stop": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/play.sh\" done",
+            "command": "\"$PLUGIN_ROOT/scripts/play.sh\" --host codex done",
             "timeout": 5
           }
         ]
@@ -26,23 +24,21 @@
     ],
     "SubagentStop": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/play.sh\" subagent",
+            "command": "\"$PLUGIN_ROOT/scripts/play.sh\" --host codex subagent",
             "timeout": 5
           }
         ]
       }
     ],
-    "Notification": [
+    "PermissionRequest": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/play.sh\" attention",
+            "command": "\"$PLUGIN_ROOT/scripts/play.sh\" --host codex attention",
             "timeout": 5
           }
         ]
@@ -54,19 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/play.sh\" plan",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "PermissionRequest": [
-      {
-        "matcher": "ExitPlanMode",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/play.sh\" plan",
+            "command": "\"$PLUGIN_ROOT/scripts/play.sh\" --host codex plan",
             "timeout": 5
           }
         ]

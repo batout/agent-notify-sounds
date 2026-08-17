@@ -1,0 +1,25 @@
+{
+  "name": "agent-notify-sound",
+  "version": "2.0.0",
+  "description": "Plays a sound when Codex finishes a turn or stops to ask for a permission. Four themes, four distinct cues each.",
+  "author": {
+    "name": "batout"
+  },
+  "keywords": [
+    "notification",
+    "sound",
+    "audio",
+    "hooks",
+    "alert"
+  ],
+  "license": "MIT",
+  "hooks": "./hooks/codex-hooks.json",
+  "skills": "./skills",
+  "homepage": "https://github.com/batout/agent-notify-sounds",
+  "repository": "https://github.com/batout/agent-notify-sounds",
+  "interface": {
+    "displayName": "Agent notify sound",
+    "shortDescription": "A sound when the agent finishes or needs you",
+    "category": "Productivity"
+  }
+}

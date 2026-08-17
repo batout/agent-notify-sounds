@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      { "command": "./scripts/mark.sh --host cursor" }
+    ],
+    "stop": [
+      { "command": "./scripts/play.sh --host cursor done" }
+    ],
+    "subagentStop": [
+      { "command": "./scripts/play.sh --host cursor subagent" }
+    ],
+    "beforeShellExecution": [
+      { "command": "./scripts/play.sh --host cursor attention" }
+    ],
+    "beforeMCPExecution": [
+      { "command": "./scripts/play.sh --host cursor attention" }
+    ]
+  }
+}

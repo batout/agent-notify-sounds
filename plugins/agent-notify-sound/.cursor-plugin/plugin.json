@@ -1,0 +1,20 @@
+{
+  "name": "agent-notify-sound",
+  "version": "2.0.0",
+  "description": "Plays a sound when the agent finishes a turn, so you can work in another window and still catch the moment it wants you.",
+  "author": {
+    "name": "batout"
+  },
+  "keywords": [
+    "notification",
+    "sound",
+    "audio",
+    "hooks",
+    "alert"
+  ],
+  "license": "MIT",
+  "hooks": "hooks/cursor-hooks.json",
+  "commands": "commands/",
+  "homepage": "https://github.com/batout/agent-notify-sounds",
+  "repository": "https://github.com/batout/agent-notify-sounds"
+}

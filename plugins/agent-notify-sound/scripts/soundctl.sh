@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# notify-sound control CLI.
+# agent-notify-sound control CLI.
 #
 #   soundctl.sh status              show current settings
 #   soundctl.sh list                list the themes
@@ -11,40 +11,53 @@
 #   soundctl.sh on|off <event>      per-event toggle (done|attention|plan|subagent)
 #   soundctl.sh min-turn <seconds>  only ring "done" past this turn length (0 = always)
 #   soundctl.sh focus on|off        skip "done" while your terminal is frontmost (macOS)
+#   soundctl.sh cursor-attention on|off  ring "attention" before every Cursor
+#                                   shell or MCP call (Cursor has no
+#                                   notification event of its own)
 #   soundctl.sh test <event>        play one cue
 #   soundctl.sh stop                stop whatever is playing right now
+#
+# Add --host claude|cursor|codex first to act as that agent, which only changes
+# which directory `set --here` writes to.
 
 set -u
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
 NS_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
 
+if [ "${1:-}" = "--host" ]; then
+  NS_HOST="$(printf '%s' "${2:-claude}" | tr -cd 'a-z-')"
+  [ -n "$NS_HOST" ] || NS_HOST="claude"
+  shift 2
+fi
+
 label() {
   case "$1" in
-    zaghlalah) printf '%-9s — short radio beeps, morse DO / NE / PL' "$1" ;;
-    jersey)    printf '%-9s — overdriven bass riff with a little swagger' "$1" ;;
-    marimba)   printf '%-9s — warm wooden mallets, soft and short' "$1" ;;
-    system)    printf '%-9s — OS built-ins: Glass / Submarine / Hero' "$1" ;;
-    *)         printf '%-9s — custom theme, sounds/%s/' "$1" "$1" ;;
+    zaghlalah) printf '%-9s  short radio beeps, morse DO / NE / PL' "$1" ;;
+    jersey)    printf '%-9s  overdriven bass riff with a little swagger' "$1" ;;
+    marimba)   printf '%-9s  warm wooden mallets, soft and short' "$1" ;;
+    system)    printf '%-9s  OS built-ins: Glass / Submarine / Hero' "$1" ;;
+    *)         printf '%-9s  custom theme, sounds/%s/' "$1" "$1" ;;
   esac
 }
 
 event_label() {
   case "$1" in
     done)      printf 'the task or the answer is finished' ;;
-    attention) printf 'waiting on you — question or permission' ;;
+    attention) printf 'waiting on you: a question or a permission' ;;
     plan)      printf 'plan ready for approval' ;;
     subagent)  printf 'a background agent finished' ;;
   esac
 }
 
-# "0.7 (user)" — so it's obvious when a project file is overriding you.
+# "0.7 (user)", so it's obvious when a project file is overriding you.
 cfg_show() { printf '%s (%s)' "$(cfg_get "$1" "$2")" "$(cfg_source "$1")"; }
 
 cmd_status() {
   local t pf mt
   t="$(current_theme)"
-  echo "notify-sound"
+  echo "agent-notify-sound"
+  echo "  host       : $NS_HOST"
   echo "  theme      : $t ($(cfg_source theme))"
   echo "  volume     : $(cfg_show volume 0.7)"
   echo "  muted      : $(cfg_show mute 0)"
@@ -59,14 +72,17 @@ cmd_status() {
   fi
   echo "               silent for $(awk -v m="$(cfg_get done_suppress_ms 10000)" 'BEGIN{printf "%.0fs", m/1000}') after a plan or permission cue"
   [ "$(cfg_get focus_aware 0)" = "1" ] && echo "               skipped while ${TERM_PROGRAM:-your terminal} is frontmost"
+  [ "$NS_HOST" = "cursor" ] && \
+    echo "  attention  : cursor_attention=$(cfg_get cursor_attention 0) (1 = ring before every shell or MCP call)"
   echo "  player     : $(player_name)"
   is_remote && echo "  remote     : SSH session, mode=$(cfg_get remote bell)"
   echo "  config     : $CONFIG_FILE"
-  pf="$(project_config_file 2>/dev/null)" || pf=""
-  [ -n "$pf" ] && [ -f "$pf" ] && echo "               $pf (project, wins)"
+  [ -f "$LEGACY_CONFIG_FILE" ] && echo "               $LEGACY_CONFIG_FILE (1.x, still read)"
+  pf="$(cfg_project_hit theme 2>/dev/null)" || pf=""
+  [ -n "$pf" ] && echo "               $pf (project, wins)"
   echo "  resolved   :"
   for e in $EVENTS; do
-    printf '    %-10s %s\n' "$e" "$(resolve_sound "$t" "$e" || printf '—')"
+    printf '    %-10s %s\n' "$e" "$(resolve_sound "$t" "$e" || printf '-')"
   done
 }
 
@@ -81,7 +97,7 @@ cmd_list() {
   for e in $EVENTS; do printf '      %-10s %s\n' "$e" "$(event_label "$e")"; done
 }
 
-# Duration in seconds, best effort — ffprobe, macOS afinfo, or the WAV header.
+# Duration in seconds, best effort: ffprobe, macOS afinfo, or the WAV header.
 sound_duration() {
   local f="$1" d=""
   [ -n "$f" ] && [ -r "$f" ] || return 0
@@ -118,7 +134,7 @@ cmd_sounds() {
           "$t$([ "$t" = "$cur" ] && printf '*')" "$e" "(OS built-in)" "-" "-" "-"
         continue
       fi
-      # A cue with no file of its own borrows another one — flag it.
+      # A cue with no file of its own borrows another one, so flag it.
       # ASCII on purpose: printf pads %-26s by bytes, so a multibyte marker
       # would shift every column after it.
       shared=""
@@ -126,7 +142,7 @@ cmd_sounds() {
       fmt="$(printf '%s' "${f##*.}" | tr '[:upper:]' '[:lower:]')"
       printf '  %-10s %-10s %-26s %-6s %8s %7s\n' \
         "$t$([ "$t" = "$cur" ] && printf '*')" "$e" \
-        "$([ -n "$f" ] && basename "$f" || printf '—')$shared" \
+        "$([ -n "$f" ] && basename "$f" || printf '-')$shared" \
         "${fmt:--}" "$(sound_duration "$f")" "$(sound_size "$f")"
     done
   done
@@ -164,7 +180,7 @@ cmd_set() {
   esac
   cfg_set theme "$t" "$scope" || { echo "no project directory to write to"; return 1; }
   if [ "$scope" = "project" ]; then
-    echo "theme set to: $t (this project only — $(project_config_file))"
+    echo "theme set to: $t (this project only, $(project_config_file))"
   else
     echo "theme set to: $t"
   fi
@@ -195,6 +211,13 @@ case "${1:-status}" in
   on)      cfg_set "${2:?event}" 1; echo "${2} sound enabled" ;;
   off)     cfg_set "${2:?event}" 0; echo "${2} sound disabled" ;;
   min-turn) cmd_min_turn "${2:-}" ;;
+  cursor-attention)
+           case "${2:-}" in
+             on)  cfg_set cursor_attention 1
+                  echo "attention now rings before every Cursor shell or MCP call" ;;
+             off) cfg_set cursor_attention 0; echo "Cursor attention cue off" ;;
+             *)   echo "usage: cursor-attention on|off"; exit 1 ;;
+           esac ;;
   focus)   case "${2:-}" in
              on)  cfg_set focus_aware 1; echo "done is skipped while your terminal is frontmost" ;;
              off) cfg_set focus_aware 0; echo "focus check off" ;;

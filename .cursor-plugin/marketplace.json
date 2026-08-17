@@ -1,0 +1,24 @@
+{
+  "name": "agent-notify-sounds",
+  "owner": {
+    "name": "batout"
+  },
+  "metadata": {
+    "description": "Audio feedback plugins for coding agents.",
+    "version": "2.0.0"
+  },
+  "plugins": [
+    {
+      "name": "agent-notify-sound",
+      "source": { "path": "./plugins/agent-notify-sound" },
+      "description": "Plays a sound when the agent finishes a turn, so you can work in another window and still catch the moment it wants you.",
+      "version": "2.0.0",
+      "author": { "name": "batout" },
+      "category": "productivity",
+      "keywords": ["notification", "sound", "audio", "hooks", "alert", "accessibility"],
+      "license": "MIT",
+      "homepage": "https://github.com/batout/agent-notify-sounds",
+      "repository": "https://github.com/batout/agent-notify-sounds"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "agent-notify-sounds",
+  "interface": {
+    "displayName": "Agent notify sounds"
+  },
+  "plugins": [
+    {
+      "name": "agent-notify-sound",
+      "source": { "source": "local", "path": "./plugins/agent-notify-sound" },
+      "policy": {
+        "installation": "AVAILABLE"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
