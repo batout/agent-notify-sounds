@@ -142,6 +142,20 @@ turning around. `done` means finished, so it stays quiet when the agent stopped
 to ask you something, which already made its own noise, and on turns short
 enough that you were clearly still watching.
 
+Here is the default `zaghlalah` theme, rendered from the files the plugin
+actually ships. Each cue keys a two-letter abbreviation in morse at its own
+pitch, so they stay apart even at low volume:
+
+| Cue | Morse | Waveform | Length |
+|-----|-------|----------|--------|
+| `done` | `DO` | <picture><source media="(prefers-color-scheme: dark)" srcset="assets/cue-done-dark.png"><img src="assets/cue-done-light.png" width="320" alt="Waveform of the done cue: one dash, two dots, then three dashes"></picture> | 1.14 s |
+| `attention` | `NE` | <picture><source media="(prefers-color-scheme: dark)" srcset="assets/cue-attention-dark.png"><img src="assets/cue-attention-light.png" width="320" alt="Waveform of the attention cue: a dash, a dot, then a single dot"></picture> | 0.54 s |
+| `plan` | `PL` | <picture><source media="(prefers-color-scheme: dark)" srcset="assets/cue-plan-dark.png"><img src="assets/cue-plan-light.png" width="320" alt="Waveform of the plan cue: dot dash dash dot, then dot dash dot dot"></picture> | 1.24 s |
+
+`attention` is the shortest of the three, which is the one you want to notice
+fastest. `subagent` reuses the `done` file unless a theme ships its own. To hear
+them rather than read them, run `/sound preview`.
+
 ## What each agent can actually tell you
 
 The cues you get depend on which events the agent exposes. Nothing here is
