@@ -9,6 +9,22 @@ way to know it finished is to keep going back and looking. Worse is when it
 stopped four minutes ago to ask you a yes/no question and has been sitting there
 ever since. This fixes that.
 
+## What's new in 2.1.0
+
+[Released today](https://github.com/batout/agent-notify-sounds/releases/tag/v2.1.0),
+and it is the release that stops this being a Claude Code plugin:
+
+- **Codex CLI and Cursor** run the same scripts, shipped as native plugins for
+  each. Codex hook events line up with Claude's closely enough to need no
+  changes; Cursor gets its own hooks file for its different schema.
+- **Windows** plays through PowerShell on Git Bash and WSL, wav and mp3, volume
+  included, with `C:\Windows\Media` behind the `system` theme.
+- **One config** at `~/.config/notify-sound/config`, so the theme you pick in
+  one agent is the theme the other two use.
+- **A test suite** of 40 assertions, run on macOS, Linux and Windows in CI.
+
+Coming from 1.x, the ids changed. See [upgrading](#upgrading-from-1x).
+
 ## Install
 
 Claude Code:
