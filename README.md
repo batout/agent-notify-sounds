@@ -12,8 +12,7 @@ ever since. This fixes that.
 ![The /sound CLI: status, the theme list, switching to jersey, the sound inventory, and raising the min-turn threshold](assets/demo.gif)
 
 That is `/sound` in Claude Code and Cursor, and the same thing as a skill in
-Codex. The recording script is [`assets/demo.tape`](assets/demo.tape), if you
-want to rebuild it after a change.
+Codex. 
 
 ## What's new in 2.1.0
 
