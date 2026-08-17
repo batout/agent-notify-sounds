@@ -1,5 +1,7 @@
 # agent-notify-sounds
 
+[![tests](https://github.com/batout/agent-notify-sounds/actions/workflows/test.yml/badge.svg)](https://github.com/batout/agent-notify-sounds/actions/workflows/test.yml)
+
 Audio feedback for coding agents. Works in Claude Code, Codex CLI and Cursor.
 
 Agents are silent. Start something long, switch to another window, and the only
@@ -46,7 +48,9 @@ backed up first.
 ## Setup by platform
 
 macOS, Linux and Windows all work. What differs is which program ends up
-playing the file, and `/sound status` names the one it picked.
+playing the file, and `/sound status` names the one it picked. The test suite
+runs on all three in CI, so the differences stay honest; `bash tests/run-tests.sh`
+runs it locally.
 
 ### macOS
 
