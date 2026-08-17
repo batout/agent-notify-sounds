@@ -9,6 +9,12 @@ way to know it finished is to keep going back and looking. Worse is when it
 stopped four minutes ago to ask you a yes/no question and has been sitting there
 ever since. This fixes that.
 
+![The /sound CLI: status, the theme list, switching to jersey, the sound inventory, and raising the min-turn threshold](assets/demo.gif)
+
+That is `/sound` in Claude Code and Cursor, and the same thing as a skill in
+Codex. The recording script is [`assets/demo.tape`](assets/demo.tape), if you
+want to rebuild it after a change.
+
 ## What's new in 2.1.0
 
 [Released today](https://github.com/batout/agent-notify-sounds/releases/tag/v2.1.0),
