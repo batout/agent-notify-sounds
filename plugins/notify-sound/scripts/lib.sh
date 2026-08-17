@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # Shared helpers for the notify-sound plugin.
-# Sourced by play.sh and soundctl.sh.
+# Sourced by play.sh, mark.sh and soundctl.sh.
 
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 SOUNDS_DIR="$PLUGIN_ROOT/sounds"
 CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 CONFIG_FILE="$CONFIG_DIR/notify-sound.conf"
 
-EVENTS="done attention plan"
+EVENTS="done attention plan subagent"
+# Cues that mean "Claude stopped and is waiting on you". The `done` that the
+# Stop hook fires right behind one of these is not a finished turn, so it gets
+# suppressed — see play.sh.
+BLOCKING_EVENTS="attention plan"
 DEFAULT_THEME="zaghlalah"   # also the fallback when "system" isn't available
 
 # Themes are drop-in: every sounds/<name>/ directory is a theme, no code change
@@ -24,28 +28,108 @@ discover_themes() {
 }
 THEMES="$(discover_themes)"
 
-# ---------------------------------------------------------------- config --
-# Simple key=value file so we never need jq. Missing file == defaults.
-cfg_get() {
-  local key="$1" default="$2" val=""
-  if [ -f "$CONFIG_FILE" ]; then
-    val=$(grep -E "^[[:space:]]*${key}[[:space:]]*=" "$CONFIG_FILE" 2>/dev/null \
-          | tail -n 1 | cut -d= -f2- | tr -d '"'"'"' \r' | xargs 2>/dev/null)
-  fi
-  [ -n "$val" ] && printf '%s' "$val" || printf '%s' "$default"
+# ----------------------------------------------------------------- state --
+# Per session, so two Claude windows never share a debounce stamp or kill each
+# other's clip. play.sh sets NS_SID from the hook payload; the CLI stays "cli".
+STATE_DIR="${TMPDIR:-/tmp}/claude-notify-sound"
+NS_SID="cli"
+NS_PAYLOAD=""
+NS_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-}"
+
+state_path() { printf '%s/%s.%s' "$STATE_DIR" "$NS_SID" "$1"; }
+state_init() { mkdir -p "$STATE_DIR" 2>/dev/null || true; }
+
+# Session ids come off the wire, so they never touch a path unsanitized.
+sanitize_sid() {
+  local s
+  s="$(printf '%s' "${1:-}" | tr -cd 'A-Za-z0-9._-' | cut -c1-64)"
+  [ -n "$s" ] && printf '%s' "$s" || printf 'cli'
 }
 
-cfg_set() {
-  local key="$1" val="$2" tmp
-  mkdir -p "$CONFIG_DIR"
-  [ -f "$CONFIG_FILE" ] || printf '# notify-sound plugin settings\n' > "$CONFIG_FILE"
+# Old sessions leave a handful of tiny files behind; sweep them in the
+# background so a turn never waits on it.
+reap_state() {
+  [ -d "$STATE_DIR" ] || return 0
+  ( find "$STATE_DIR" -type f -mtime +1 -delete >/dev/null 2>&1 & ) 2>/dev/null || true
+}
+
+now_ms() {
+  if command -v perl >/dev/null 2>&1; then
+    perl -MTime::HiRes=time -e 'printf "%d", time()*1000' 2>/dev/null && return 0
+  fi
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import time;print(int(time.time()*1000))' 2>/dev/null && return 0
+  fi
+  printf '%s000' "$(date +%s)"
+}
+
+is_int() { case "${1:-}" in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac; }
+
+# Pulls a string field out of the hook JSON without needing jq, same spirit as
+# the config parser below. Returns empty when the key isn't there.
+json_str() {
+  local key="$1" p="${2:-$NS_PAYLOAD}"
+  [ -n "$p" ] || return 1
+  printf '%s' "$p" | tr -d '\n' \
+    | sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1
+}
+
+# ---------------------------------------------------------------- config --
+# Simple key=value files so we never need jq. Two layers: the project file
+# wins over the user file, so a repo can have its own theme and you can tell
+# which window beeped. Missing files == defaults.
+project_config_file() {
+  [ -n "$NS_PROJECT_DIR" ] || return 1
+  printf '%s/.claude/notify-sound.conf' "$NS_PROJECT_DIR"
+}
+
+cfg_read_file() {   # <file> <key>; fails when unset
+  local val
+  [ -f "$1" ] || return 1
+  val=$(grep -E "^[[:space:]]*${2}[[:space:]]*=" "$1" 2>/dev/null \
+        | tail -n 1 | cut -d= -f2- | tr -d '"'"'"' \r' | xargs 2>/dev/null)
+  [ -n "$val" ] || return 1
+  printf '%s' "$val"
+}
+
+cfg_get() {
+  local key="$1" default="${2:-}" val pf
+  pf="$(project_config_file 2>/dev/null)" || pf=""
+  if [ -n "$pf" ] && val="$(cfg_read_file "$pf" "$key")"; then
+    printf '%s' "$val"; return 0
+  fi
+  if val="$(cfg_read_file "$CONFIG_FILE" "$key")"; then
+    printf '%s' "$val"; return 0
+  fi
+  printf '%s' "$default"
+}
+
+# Which layer a value came from — shown by `soundctl.sh status`.
+cfg_source() {
+  local pf
+  pf="$(project_config_file 2>/dev/null)" || pf=""
+  if [ -n "$pf" ] && cfg_read_file "$pf" "$1" >/dev/null 2>&1; then printf 'project'; return 0; fi
+  if cfg_read_file "$CONFIG_FILE" "$1" >/dev/null 2>&1; then printf 'user'; return 0; fi
+  printf 'default'
+}
+
+cfg_set() {   # <key> <value> [project]
+  local key="$1" val="$2" scope="${3:-user}" file tmp
+  if [ "$scope" = "project" ]; then
+    file="$(project_config_file 2>/dev/null)" || return 1
+  else
+    file="$CONFIG_FILE"
+  fi
+  mkdir -p "$(dirname "$file")" 2>/dev/null || true
+  [ -f "$file" ] || printf '# notify-sound plugin settings\n' > "$file"
   tmp="$(mktemp)"
-  grep -vE "^[[:space:]]*${key}[[:space:]]*=" "$CONFIG_FILE" > "$tmp" 2>/dev/null
+  grep -vE "^[[:space:]]*${key}[[:space:]]*=" "$file" > "$tmp" 2>/dev/null
   printf '%s=%s\n' "$key" "$val" >> "$tmp"
-  mv "$tmp" "$CONFIG_FILE"
+  mv "$tmp" "$file"
 }
 
 is_macos() { [ "$(uname -s 2>/dev/null)" = "Darwin" ]; }
+is_remote() { [ -n "${SSH_TTY:-}${SSH_CONNECTION:-}" ]; }
 
 normalize_theme() {   # accept the old names from 0.1.x
   case "$1" in chime|morse) printf 'zaghlalah' ;; *) printf '%s' "$1" ;; esac
@@ -62,35 +146,58 @@ current_theme() {
 current_volume() { cfg_get volume "0.7"; }
 
 # ------------------------------------------------------------ resolution --
-# macOS system sounds used by the "system" theme.
-macos_sound_for() {
-  case "$1" in
-    done)      printf '/System/Library/Sounds/Glass.aiff' ;;
-    attention) printf '/System/Library/Sounds/Submarine.aiff' ;;
-    plan)      printf '/System/Library/Sounds/Hero.aiff' ;;
-  esac
+# Built-in OS sounds used by the "system" theme.
+system_sound_for() {
+  local event="$1" f
+  if is_macos; then
+    case "$event" in
+      done)      f='/System/Library/Sounds/Glass.aiff' ;;
+      attention) f='/System/Library/Sounds/Submarine.aiff' ;;
+      plan)      f='/System/Library/Sounds/Hero.aiff' ;;
+      subagent)  f='/System/Library/Sounds/Pop.aiff' ;;
+    esac
+  else
+    case "$event" in   # freedesktop, present on most Linux desktops
+      done)      f='/usr/share/sounds/freedesktop/stereo/complete.oga' ;;
+      attention) f='/usr/share/sounds/freedesktop/stereo/message.oga' ;;
+      plan)      f='/usr/share/sounds/freedesktop/stereo/dialog-information.oga' ;;
+      subagent)  f='/usr/share/sounds/freedesktop/stereo/bell.oga' ;;
+    esac
+  fi
+  [ -n "${f:-}" ] && printf '%s' "$f"
 }
 
-# Echoes the absolute path of the file to play for <theme> <event>.
-resolve_sound() {
-  local theme event f
-  theme="$(normalize_theme "$1")"; event="$2"
-  if [ "$theme" = "system" ]; then
-    f="$(macos_sound_for "$event")"
-    if is_macos && [ -r "$f" ]; then printf '%s' "$f"; return 0; fi
-    theme="$DEFAULT_THEME"   # fall back to the bundled set off macOS
-  fi
-  # Themes may ship .wav (synthesized) or .mp3 (audio clips).
+# A theme may ship only the three original cues. Anything newer falls back to
+# a cue every theme has, so no theme ever needs updating to keep working.
+cue_fallback() {
+  case "$1" in subagent) printf 'done' ;; *) printf '' ;; esac
+}
+
+theme_file() {   # <theme> <event>; exact file only, no fallback
+  local theme="$1" event="$2" f ext
   for ext in wav mp3 m4a aiff ogg flac; do
     f="$SOUNDS_DIR/$theme/$event.$ext"
     [ -r "$f" ] && { printf '%s' "$f"; return 0; }
   done
+  return 1
+}
+
+# Echoes the absolute path of the file to play for <theme> <event>.
+resolve_sound() {
+  local theme event f alt
+  theme="$(normalize_theme "$1")"; event="$2"
+  if [ "$theme" = "system" ]; then
+    f="$(system_sound_for "$event")"
+    if [ -n "$f" ] && [ -r "$f" ]; then printf '%s' "$f"; return 0; fi
+    theme="$DEFAULT_THEME"   # fall back to the bundled set
+  fi
+  theme_file "$theme" "$event" && return 0
+  alt="$(cue_fallback "$event")"
+  [ -n "$alt" ] && theme_file "$theme" "$alt" && return 0
+  return 1
 }
 
 # ---------------------------------------------------------------- player --
-PIDFILE="${TMPDIR:-/tmp}/.claude-notify-sound.pid"
-
-
 # Echoes the best available player for a given file, or nothing.
 pick_player() {
   local ext order p
@@ -105,15 +212,26 @@ pick_player() {
   return 1
 }
 
-# Stops whatever this plugin is currently playing (clips can run several seconds).
-stop_playing() {
-  local pid
-  [ -f "$PIDFILE" ] || return 0
-  pid="$(cat "$PIDFILE" 2>/dev/null)"
-  case "$pid" in ''|*[!0-9]*) return 0 ;; esac
+kill_pidfile() {
+  local pf="$1" pid
+  [ -f "$pf" ] || return 0
+  pid="$(cat "$pf" 2>/dev/null)"
+  case "$pid" in ''|*[!0-9]*) rm -f "$pf" 2>/dev/null; return 0 ;; esac
   kill "$pid" 2>/dev/null
-  rm -f "$PIDFILE" 2>/dev/null
+  rm -f "$pf" 2>/dev/null
   return 0
+}
+
+# Stops what this session is playing (clips can run several seconds).
+# --all stops every session's, which is what the CLI wants.
+stop_playing() {
+  local f
+  if [ "${1:-}" = "--all" ]; then
+    [ -d "$STATE_DIR" ] || return 0
+    for f in "$STATE_DIR"/*.pid; do [ -f "$f" ] || continue; kill_pidfile "$f"; done
+    return 0
+  fi
+  kill_pidfile "$(state_path pid)"
 }
 
 # Plays a file. Returns immediately; audio finishes in the background.
@@ -123,6 +241,7 @@ play_file() {
   p="$(pick_player "$f")" || { printf '\a' >/dev/tty 2>/dev/null; return 0; }
 
   stop_playing
+  state_init
 
   case "$p" in
     afplay)  nohup afplay -v "$vol" "$f" >/dev/null 2>&1 </dev/null & ;;
@@ -146,7 +265,7 @@ play_file() {
                "(New-Object Media.SoundPlayer '$wf').PlaySync()" \
                >/dev/null 2>&1 </dev/null & ;;
   esac
-  printf '%s' "$!" > "$PIDFILE" 2>/dev/null
+  printf '%s' "$!" > "$(state_path pid)" 2>/dev/null
   disown 2>/dev/null || true
   return 0
 }

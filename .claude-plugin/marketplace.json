@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "Audio feedback plugins for Claude Code.",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "plugins": [
     {
       "name": "notify-sound",
       "source": "./plugins/notify-sound",
-      "description": "Plays a sound when Claude Code finishes a turn, needs an answer or a permission, or is waiting on plan approval. Four themes, three distinct cues each.",
+      "description": "Plays a sound when Claude Code finishes the work, needs an answer or a permission, or is waiting on plan approval. Four themes, four distinct cues each.",
       "category": "productivity",
       "keywords": ["notification", "sound", "audio", "hooks", "alert", "accessibility"],
       "license": "MIT",

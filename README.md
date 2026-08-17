@@ -24,22 +24,25 @@ Plays a short sound whenever Claude Code stops and wants you.
 
 | Cue | Fires when |
 |-----|-----------|
-| done | Claude finished responding and the turn ended |
+| done | Claude finished the task or the answer |
 | attention | Claude is waiting on you: a question, or a tool asking permission |
 | plan | A plan is on screen waiting for your approval |
+| subagent | A background agent finished |
 
-The three cues are different sounds, so you can tell which one happened without
-turning around.
+Every cue is a different sound, so you can tell which one happened without
+turning around. `done` means *finished*, so it stays quiet when Claude stopped
+to ask you something — that already made its own noise — and on turns short
+enough that you were clearly still watching.
 
 | Theme | Sound |
 |-------|-------|
 | `zaghlalah` | Radio beeps keying `DO` / `NE` / `PL` in morse. Default. |
 | `jersey` | Overdriven bass riff with a bit of swagger |
 | `marimba` | Warm wooden mallets, soft and short |
-| `system` | macOS built-ins: Glass, Submarine, Hero |
+| `system` | OS built-ins: Glass / Submarine / Hero on macOS, freedesktop on Linux |
 
 The [plugin README](plugins/notify-sound/README.md) covers the rest: per-cue
-toggles, volume, mute, and how to drop in your own sounds.
+toggles, volume, mute, per-project themes, and how to drop in your own sounds.
 
 ## Rolling it out to a team
 
@@ -75,7 +78,8 @@ A theme is a directory with three sound files in it. No code changes:
 plugins/notify-sound/sounds/<your-theme>/
 ├── done.wav
 ├── attention.wav
-└── plan.wav
+├── plan.wav
+└── subagent.wav   (optional — falls back to done.wav)
 ```
 
 `.wav`, `.mp3`, `.m4a`, `.aiff`, `.ogg`, and `.flac` all work. The theme shows

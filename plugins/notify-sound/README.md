@@ -7,12 +7,27 @@ away from the terminal and still catch the moment something needs an answer.
 
 | Cue | Hook event | Plays when |
 |-----|-----------|------------|
-| done | `Stop` | Claude finished responding, the turn ended |
+| done | `Stop` | Claude finished the task or the answer — not when it stopped to ask you something |
 | attention | `Notification` | Claude is waiting on you: a question, or a tool asking permission |
 | plan | `PreToolUse` / `PermissionRequest` matching `ExitPlanMode` | A plan is on screen waiting for approval |
+| subagent | `SubagentStop` | A background agent finished |
 
 Each cue is a different sound, so you can tell which one happened without
-looking. Overlapping events inside a 1.8 second window collapse into one sound.
+looking.
+
+Two rules keep `done` from talking over the others:
+
+- **A blocking cue cancels the `done` behind it.** Presenting a plan fires `plan`,
+  and the turn then ends, which fires `Stop` a moment later. That second sound is
+  not a finished turn, so it's dropped for `done_suppress_ms` (10 s) after any
+  `plan` or `attention`. It only works in that direction — an `attention` that
+  follows a real `done` still rings.
+- **Short turns stay quiet.** `done` only rings past `min_turn_ms` (15 s), on the
+  theory that if it came back in four seconds you were sitting right there.
+  `/sound min-turn 0` brings back the old always-ring behaviour.
+
+Neither rule touches `attention` or `plan`. Those mean Claude is blocked on you
+and they always ring.
 
 ## The four themes
 
@@ -21,7 +36,10 @@ looking. Overlapping events inside a 1.8 second window collapse into one sound.
 | `zaghlalah` | Radio beeps: a CW sidetone keying `DO`, `NE`, and `PL` in morse. Default. |
 | `jersey` | Overdriven bass riff with a bit of swagger |
 | `marimba` | Warm wooden mallets, soft and short |
-| `system` | macOS built-ins: Glass, Submarine, Hero |
+| `system` | OS built-ins: Glass / Submarine / Hero on macOS, freedesktop sounds on Linux |
+
+A theme that ships only the three original cues still works: `subagent` falls
+back to that theme's `done` file. `/sound sounds` marks borrowed cues with `<-`.
 
 ### zaghlalah
 
@@ -61,7 +79,7 @@ git clone https://github.com/batout/claude-code-sounds.git
 claude --plugin-dir claude-code-sounds/plugins/notify-sound
 ```
 
-Run `/hooks` afterward and you should see four entries.
+Run `/hooks` afterward and you should see six entries.
 
 ## Using it
 
@@ -69,9 +87,12 @@ Run `/hooks` afterward and you should see four entries.
 /sound                     pick a theme interactively
 /sound list                show the themes
 /sound sounds              every file, with format, length, and size
-/sound preview jersey      hear all three cues of a theme
+/sound preview jersey      hear all the cues of a theme
 /sound set zaghlalah       switch theme
+/sound set --here marimba  switch theme for this project only
 /sound volume 0.4          quieter
+/sound min-turn 30         only ring "done" past a 30 second turn (0 = always)
+/sound focus on            skip "done" while your terminal is frontmost (macOS)
 /sound mute                silence everything
 /sound off done            keep only the "needs you" sounds
 /sound stop                cut off a sound that's playing
@@ -86,17 +107,18 @@ All of it works from a shell too, without Claude:
 ./scripts/soundctl.sh set marimba
 ```
 
-### The setting most people end up changing
+### If `done` still fires more than you want
 
-`done` fires on every turn, including the quick back-and-forths where you're
-sitting right there watching it work. If that gets annoying:
+Raise the bar rather than turning it off, so you keep the signal on the long
+runs that are the whole point:
 
 ```
-/sound off done
+/sound min-turn 60      only turns over a minute
+/sound focus on         and only when you're looking at another window
 ```
 
-Now it only makes noise when Claude can't proceed without you. `/sound on done`
-puts it back.
+`/sound off done` still works if you want nothing but the "needs you" cues, and
+`/sound on done` puts it back.
 
 ## Adding your own sounds
 
@@ -125,16 +147,27 @@ rather than layering on top.
 Stored in `~/.claude/notify-sound.conf` and applied immediately, no restart:
 
 ```ini
-theme=zaghlalah    # any theme directory name, or "system"
-volume=0.7         # 0.0 to 1.0
-mute=0             # 1 silences everything
-done=1             # per-cue on/off
+theme=zaghlalah        # any theme directory name, or "system"
+volume=0.7             # 0.0 to 1.0
+mute=0                 # 1 silences everything
+done=1                 # per-cue on/off
 attention=1
 plan=1
-debounce_ms=1800   # collapse events closer together than this
+subagent=1
+min_turn_ms=15000      # "done" only past this turn length; 0 = always ring
+done_suppress_ms=10000 # drop "done" this long after a plan/attention cue
+focus_aware=0          # 1 = also skip "done" when your terminal is frontmost
+debounce_ms=1800       # collapse events closer together than this
+remote=bell            # over SSH: bell | play | off
+debug=0                # 1 dumps each hook payload into the state dir
 ```
 
-`CLAUDE_SOUND_THEME` and `CLAUDE_SOUND_MUTE=1` override the file.
+A project can override any of these in `<project>/.claude/notify-sound.conf`,
+which wins over the user file. Give each repo its own theme and the sound tells
+you which window wants you. `/sound status` shows the layer every value came
+from.
+
+`CLAUDE_SOUND_THEME` and `CLAUDE_SOUND_MUTE=1` override both files.
 
 ## How playback works
 
@@ -147,6 +180,15 @@ playing PID so the next event can cut a long sound off.
 It always exits 0. A missing player or a missing sound file can't block a turn
 or fail one; the worst case is a terminal bell.
 
+Over SSH the sound would come out of the machine Claude is running on, which is
+not the one you're sitting at, so the local terminal's bell rings instead. Set
+`remote=play` if that box really does have speakers you can hear.
+
+State lives in `$TMPDIR/claude-notify-sound/`, one small file per session keyed
+by the hook's `session_id`. That's what keeps two Claude windows from swallowing
+each other's cues or cutting each other's clips off; stale files are swept after
+a day.
+
 ## Layout
 
 ```
@@ -154,7 +196,7 @@ notify-sound/
 ├── .claude-plugin/plugin.json
 ├── hooks/hooks.json
 ├── commands/sound.md
-├── scripts/{play.sh,soundctl.sh,lib.sh}
+├── scripts/{play.sh,mark.sh,soundctl.sh,lib.sh}
 └── sounds/
     ├── zaghlalah/{done,attention,plan}.wav
     ├── jersey/{done,attention,plan}.wav

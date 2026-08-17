@@ -1,7 +1,7 @@
 {
   "name": "notify-sound",
-  "version": "1.0.0",
-  "description": "Plays a sound when Claude Code finishes a turn, needs an answer or a permission, or is waiting on plan approval. Four themes, three distinct cues each.",
+  "version": "1.1.0",
+  "description": "Plays a sound when Claude Code finishes the work, needs an answer or a permission, or is waiting on plan approval. Four themes, four distinct cues each.",
   "author": {
     "name": "batout"
   },
